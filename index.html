@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html> 
+<head> 
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8"/> 
+    <title>Example</title> 
+
+    <script src="https://maps.googleapis.com/maps/api/js?v=3.exp&sensor=false" type="text/javascript"></script> 
+    <script src="js/jquery.min.js" type="text/javascript"></script>
+    <script src="js/jquery.base64.min.js" type="text/javascript"></script>
+    <script src="js/three.js" type="text/javascript"></script>
+    <script src="js/zpipe.min.js" type="text/javascript"></script>
+    <script src="js/GSVPano.js" type="text/javascript"></script>
+    <script src="js/GSVPanoDepth.js" type="text/javascript"></script>
+    <script src="js/utils.js" type="text/javascript"></script>
+    <script src="js/wallParser.js" type="text/javascript"></script>
+    <script>
+        var colors = [];
+        colors.push([0, 0, 0]);
+        for(var i = 1; i < 200; i++){
+            colors.push([Math.random() * 255, Math.random() * 255, Math.random()]);
+        }
+
+        function init(lat, lng) {
+            $('#maps').empty();
+            var _panoLoader = new GSVPANO.PanoLoader({zoom: 1});
+            var _depthLoader = new GSVPANO.PanoDepthLoader();
+
+            _depthLoader.onDepthLoad = function(success) {
+                if(success){
+                    var x, y, canvas, context, image, w, h, c;
+                    var rgbW = parseInt(this.rgbCanvas.getAttribute('width')),
+                        rgbH = parseInt(this.rgbCanvas.getAttribute('height')),
+                        rgbCanvas = this.rgbCanvas, 
+                        rgbImage = rgbCanvas.getContext('2d').getImageData(0, 0, rgbW, rgbH);;
+
+                    canvas = document.createElement("canvas");
+                    canvas.setAttribute('id', 'depthMap');
+                    context = canvas.getContext('2d');
+
+                    w = this.depthMap.width;
+                    h = this.depthMap.height;
+
+                    canvas.setAttribute('width', w);
+                    canvas.setAttribute('height', h);
+                    
+                    image = context.getImageData(0, 0, w, h);
+
+                    for(y=0; y<h; ++y) {
+                        for(x=0; x<w; ++x) {
+                            c = this.depthMap.depthMap[y*w + x]; /// 50 * 255;
+                            var rx = Math.floor(x*rgbW/w), 
+                                ry = Math.floor(y*rgbH/h), 
+                                ridx = 4*(ry * rgbW + rx);
+                            image.data[4*(y*w + x)    ] = c == 0? 0: rgbImage.data[ridx];//colors[c][0];//c;
+                            image.data[4*(y*w + x) + 1] = c == 0? 0: rgbImage.data[ridx+1];//colors[c][1];//c;
+                            image.data[4*(y*w + x) + 2] = c == 0? 0: rgbImage.data[ridx+2];//colors[c][2];//c;
+                            image.data[4*(y*w + x) + 3] = 255;
+                        }
+                    }
+                    context.putImageData(image, 0, 0);
+                    // gDepthMap = this.depthMap;
+                    $('#maps').append(canvas);
+
+                    var rgbMap = {
+                        width: rgbW,
+                        height: rgbH,
+                        rgbMap: rgbImage,
+                        rgbCanvas: rgbCanvas,
+                    };
+                    WallParser(rgbMap, 
+                        this.depthMap, 
+                        this.planes, 
+                        2, 
+                        $('#maps'));                    
+                    // // save the depth map through ajax request
+                    // saveMap('depth~'+this.lat+'~'+this.lng+'~'+this.panoId, canvas.toDataURL());
+                    // // save planes & indices in csv format through ajax request
+                    // var planesData = this.heading + ',' + this.pitch + '\n', 
+                    //     indicesData = '';                 
+                    // for(y = 0; y < h; y++){
+                    //     for(x = 0; x < w; x++){
+                    //         indicesData += this.indices[y*w+x] + ((x < w - 1) ? ',' : '\n');
+                    //     }
+                    // }
+                    // for(var i = 0; i < this.planes.length; i++){
+                    //     var plane = this.planes[i];
+                    //     planesData += plane.d + ',' + plane.n[0] + ',' + plane.n[1] + ',' + plane.n[2] + '\n';
+                    // }
+                    // saveCSV('planes~'+this.lat+'~'+this.lng+'~'+this.panoId, planesData);
+                    // saveCSV('indices~'+this.lat+'~'+this.lng+'~'+this.panoId, indicesData);
+                }
+            }
+            _panoLoader.onPanoramaLoad = function(success) {
+                if(success){
+                    $('#maps').append(this.canvas);
+                    //saveMap('rgb~'+this.lat+'~'+this.lng+'~'+this.panoId, this.canvas.toDataURL());
+                    _depthLoader.lat = this.lat;
+                    _depthLoader.lng = this.lng;
+                    _depthLoader.pitch = this.pitch;
+                    _depthLoader.heading = this.heading;
+                    _depthLoader.load(this.panoId);
+                    _depthLoader.rgbCanvas = this.canvas;
+                }
+            };
+
+            _panoLoader.load(new google.maps.LatLng(lat, lng));
+        }
+
+        window.onload = function(){
+            $('#loadBtn').click(function(){
+                var input = $('#latlngInput').val();
+                var lat = parseFloat(input.split(',')[0]);
+                var lng = parseFloat(input.split(',')[1]);
+                init(lat, lng);
+            });
+        }
+    </script> 
+    <script>
+    </script>
+</head> 
+<body> 
+    Lat(horizontal), Lng(vertical): <input type="text" id="latlngInput"/>
+    <button type="button" id="loadBtn">Load</button>
+    <div id="maps">
+</body> 
+</html>
